@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quarantine Operations Command Center (74-Bed Facility)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN for visual analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- TOP BAR / HEADER -->
+    <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-30 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-indigo-600 rounded-lg text-white font-bold text-xl">
+                    <i class="fa-solid font-mono fa-biohazard text-amber-400"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                        BioShield Q-Center
+                        <span class="text-xs font-normal px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 border border-slate-600">Capacity: 74 Beds</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Quarantine Operations & Clinical Decision Engine</p>
+                </div>
+            </div>
+
+            <!-- Header KPIs & Live Status -->
+            <div class="flex items-center gap-6 text-sm">
+                <div class="hidden md:flex items-center gap-2">
+                    <span class="text-slate-400">Occupancy:</span>
+                    <span id="header-occupancy" class="font-semibold text-emerald-400">-- / 74</span>
+                </div>
+                <div class="hidden md:flex items-center gap-2">
+                    <span class="text-slate-400">Target Benchmark:</span>
+                    <span id="benchmark-badge" class="px-2 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        85% Target
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-400">Date:</span>
+                    <span id="current-sim-date" class="font-mono text-xs text-indigo-300 bg-slate-900 px-2 py-1 rounded border border-slate-700">2026-10-23</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROLE NAVIGATION TABS -->
+        <nav class="bg-slate-800/80 backdrop-blur border-t border-slate-700/60 px-4 sm:px-6 lg:px-8">
+            <div class="max-w-7xl mx-auto flex space-x-1 sm:space-x-4 overflow-x-auto custom-scrollbar py-2 text-sm font-medium">
+                <button onclick="switchRole('nurse')" id="tab-nurse" class="role-tab flex items-center gap-2 px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700 transition">
+                    <i class="fa-solid fa-user-nurse text-emerald-400"></i> Nurse Dashboard
+                </button>
+                <button onclick="switchRole('doctor')" id="tab-doctor" class="role-tab flex items-center gap-2 px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700 transition">
+                    <i class="fa-solid fa-stethoscope text-indigo-400"></i> Doctor Dashboard
+                    <span id="doctor-alert-count" class="bg-rose-500 text-white text-xs rounded-full px-1.5 py-0.2 font-bold hidden">0</span>
+                </button>
+                <button onclick="switchRole('admin')" id="tab-admin" class="role-tab flex items-center gap-2 px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700 transition">
+                    <i class="fa-solid fa-hospital text-blue-400"></i> Facility & Turnover (74 Rooms)
+                </button>
+                <button onclick="switchRole('finance')" id="tab-finance" class="role-tab flex items-center gap-2 px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700 transition">
+                    <i class="fa-solid fa-file-invoice-dollar text-amber-400"></i> Finance & Invoicing
+                </button>
+                <button onclick="switchRole('insights')" id="tab-insights" class="role-tab flex items-center gap-2 px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700 transition">
+                    <i class="fa-solid fa-chart-line text-purple-400"></i> HR & Smart Insights
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <!-- GLOBAL ALERT BANNER FOR SYSTEM NOTIFICATIONS -->
+        <div id="toast-notification" class="hidden fixed bottom-5 right-5 z-50 max-w-md bg-slate-800 border-l-4 border-indigo-500 text-slate-200 p-4 rounded-r-lg shadow-2xl flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <i id="toast-icon" class="fa-solid fa-circle-info text-indigo-400 text-xl"></i>
+                <div>
+                    <h4 id="toast-title" class="font-bold text-sm text-white">Notification</h4>
+                    <p id="toast-msg" class="text-xs text-slate-300">Action performed successfully.</p>
+                </div>
+            </div>
+            <button onclick="closeToast()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- 1. NURSE DASHBOARD (PATIENT MONITORING & VITAL LOGGING)              -->
+        <!-- =================================================================== -->
+        <section id="sec-nurse" class="role-section space-y-6">
+            <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-800 p-4 rounded-xl border border-slate-700">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-heart-pulse text-emerald-400"></i> Patient Monitoring & Temperature Entry
+                    </h2>
+                    <p class="text-xs text-slate-400">Record daily vitals. Temperature >99.5°F auto-creates urgent doctor tasks.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs text-slate-400">Filter Status:</span>
+                    <select id="nurse-filter" onchange="renderNurseTable()" class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500">
+                        <option value="all">All Patients</option>
+                        <option value="pending_today">Pending Daily Check</option>
+                        <option value="fever">Fever Alert (>99.5°F)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <p class="text-xs text-slate-400 font-medium">Total Active Patients</p>
+                    <p id="nurse-kpi-active" class="text-2xl font-bold text-white mt-1">0</p>
+                </div>
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <p class="text-xs text-slate-400 font-medium">Checked Today</p>
+                    <p id="nurse-kpi-checked" class="text-2xl font-bold text-emerald-400 mt-1">0</p>
+                </div>
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <p class="text-xs text-slate-400 font-medium">Pending Checks</p>
+                    <p id="nurse-kpi-pending" class="text-2xl font-bold text-amber-400 mt-1">0</p>
+                </div>
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <p class="text-xs text-slate-400 font-medium">Fever Alerts Flagged</p>
+                    <p id="nurse-kpi-fever" class="text-2xl font-bold text-rose-400 mt-1">0</p>
+                </div>
+            </div>
+
+            <!-- PATIENT MONITORING TABLE -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-lg">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-300">
+                        <thead class="bg-slate-900/80 text-xs uppercase text-slate-400 border-b border-slate-700">
+                            <tr>
+                                <th class="py-3 px-4">Room / ID</th>
+                                <th class="py-3 px-4">Patient Name</th>
+                                <th class="py-3 px-4">Today's Temp (°F)</th>
+                                <th class="py-3 px-4">SpO2 / HR</th>
+                                <th class="py-3 px-4">Check Status</th>
+                                <th class="py-3 px-4 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="nurse-patient-tbody" class="divide-y divide-slate-700/50">
+                            <!-- JS Injected Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- 2. DOCTOR DASHBOARD (CLINICAL DECISIONS & DISCHARGE)                 -->
+        <!-- =================================================================== -->
+        <section id="sec-doctor" class="role-section space-y-6 hidden">
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-user-doctor text-indigo-400"></i> Clinical Decisions & Discharge Clearance
+                    </h2>
+                    <p class="text-xs text-slate-400">Review fever trends, prescribe treatments, and strictly enforce the 3-day fever-free discharge rule.</p>
+                </div>
+            </div>
+
+            <!-- URGENT CLINICAL TASKS GENERATED BY NURSE ALERTS -->
+            <div class="bg-rose-950/30 border border-rose-800/50 p-4 rounded-xl">
+                <h3 class="text-sm font-bold text-rose-300 flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-triangle-exclamation text-rose-400"></i> High-Priority Doctor Tasks (Fever Alerts)
+                </h3>
+                <div id="doctor-urgent-tasks" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <!-- Injected doctor tasks -->
+                </div>
+            </div>
+
+            <!-- CLINICAL PATIENT REVIEW TABLE -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                <div class="p-4 border-b border-slate-700 font-bold text-sm text-slate-200">
+                    Patient List & Discharge Readiness Verification
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-300">
+                        <thead class="bg-slate-900 text-xs uppercase text-slate-400 border-b border-slate-700">
+                            <tr>
+                                <th class="py-3 px-4">Room & Name</th>
+                                <th class="py-3 px-4">Recent 3-Day Temps</th>
+                                <th class="py-3 px-4">Fever Status</th>
+                                <th class="py-3 px-4">3-Day Rule Met?</th>
+                                <th class="py-3 px-4 text-right">Clinical Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="doctor-patient-tbody" class="divide-y divide-slate-700">
+                            <!-- JS Injected -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- 3. ADMIN / OPERATIONS PANEL (74 ROOM GRID & TURNOVER)              -->
+        <!-- =================================================================== -->
+        <section id="sec-admin" class="role-section space-y-6 hidden">
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-grip text-blue-400"></i> Facility Occupancy Map (Rooms 1 - 74)
+                    </h2>
+                    <p class="text-xs text-slate-400">Manage admission allocations and trigger automated room cleaning workflows.</p>
+                </div>
+                <button onclick="openAdmissionModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus"></i> Admit New Patient
+                </button>
+            </div>
+
+            <!-- ROOM STATUS LEGEND -->
+            <div class="flex flex-wrap gap-4 text-xs bg-slate-800/60 p-3 rounded-lg border border-slate-700">
+                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Occupied (Healthy)</div>
+                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-rose-500"></span> Occupied (Fever)</div>
+                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-amber-500"></span> Pending Discharge</div>
+                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-purple-500"></span> Needs Cleaning/Turnover</div>
+                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-slate-600"></span> Ready / Available</div>
+            </div>
+
+            <!-- 74 ROOM GRID -->
+            <div id="room-grid" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2.5">
+                <!-- 74 Interactive Room Cards Injected Here -->
+            </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- 4. FINANCE & BILLING MODULE                                         -->
+        <!-- =================================================================== -->
+        <section id="sec-finance" class="role-section space-y-6 hidden">
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-receipt text-amber-400"></i> Finance, Billing & Automated Invoicing
+                </h2>
+                <p class="text-xs text-slate-400">Track room charges, insurance claim workflows, and auto-generate printable invoices post-payment.</p>
+            </div>
+
+            <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-300">
+                        <thead class="bg-slate-900 text-xs uppercase text-slate-400 border-b border-slate-700">
+                            <tr>
+                                <th class="py-3 px-4">Patient / Room</th>
+                                <th class="py-3 px-4">Stay Duration</th>
+                                <th class="py-3 px-4">Total Amount ($)</th>
+                                <th class="py-3 px-4">Insurance Status</th>
+                                <th class="py-3 px-4">Payment Status</th>
+                                <th class="py-3 px-4 text-right">Invoice Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="finance-tbody" class="divide-y divide-slate-700">
+                            <!-- JS Injected -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- 5. HR & SMART MANAGEMENT INSIGHTS                                    -->
+        <!-- =================================================================== -->
+        <section id="sec-insights" class="role-section space-y-6 hidden">
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-brain text-purple-400"></i> HR, Workforce & Smart Management Analytics
+                </h2>
+                <p class="text-xs text-slate-400">Real-time KPI performance against 85% success benchmark and AI forecasting.</p>
+            </div>
+
+            <!-- MANAGEMENT KPIS -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span>Facility Success Rate</span>
+                        <i class="fa-solid fa-bullseye text-indigo-400"></i>
+                    </div>
+                    <div class="mt-2 flex items-baseline gap-2">
+                        <span id="kpi-success-rate" class="text-3xl font-bold text-emerald-400">92%</span>
+                        <span class="text-xs text-slate-400">Target >= 85%</span>
+                    </div>
+                    <div class="w-full bg-slate-700 h-1.5 rounded-full mt-3 overflow-hidden">
+                        <div id="kpi-bar-success" class="bg-emerald-500 h-full" style="width: 92%"></div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span>Avg Room Turnover Time</span>
+                        <i class="fa-solid fa-clock-rotate-left text-amber-400"></i>
+                    </div>
+                    <div class="mt-2 flex items-baseline gap-2">
+                        <span class="text-3xl font-bold text-amber-300">42 mins</span>
+                        <span class="text-xs text-emerald-400">↓ 8% vs yesterday</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-2">Automated cleaning task triggers enabled</p>
+                </div>
+
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span>Estimated Cost per Patient Day</span>
+                        <i class="fa-solid fa-coins text-blue-400"></i>
+                    </div>
+                    <div class="mt-2 flex items-baseline gap-2">
+                        <span class="text-3xl font-bold text-blue-300">$185.00</span>
+                        <span class="text-xs text-slate-400">Budgeted: $200.00</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-2">Optimal resource utilization active</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- CHART: TEMPERATURE TRENDS ACROSS FACILITY -->
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <h3 class="text-sm font-bold text-slate-200 mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-area text-indigo-400"></i> 7-Day Temp Profile Distribution (°F)
+                    </h3>
+                    <div class="h-64">
+                        <canvas id="facilityTrendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- AI INSIGHTS & FEEDBACK -->
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-4">
+                    <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i> Predictive AI & Operational Alerts
+                    </h3>
+                    <div class="space-y-2 text-xs">
+                        <div class="p-3 rounded-lg bg-indigo-950/40 border border-indigo-800/40 text-indigo-200 flex gap-3">
+                            <i class="fa-solid fa-lightbulb text-indigo-400 text-base mt-0.5"></i>
+                            <div>
+                                <span class="font-bold">Staffing Forecast:</span> High room turnover expected tomorrow. Reallocate 2 nurses from Shift B to Shift A.
+                            </div>
+                        </div>
+                        <div class="p-3 rounded-lg bg-amber-950/40 border border-amber-800/40 text-amber-200 flex gap-3">
+                            <i class="fa-solid fa-box-open text-amber-400 text-base mt-0.5"></i>
+                            <div>
+                                <span class="font-bold">Inventory Low-Stock Warning:</span> PPE Kits & Sterile Swabs approaching threshold (4 days remaining).
+                            </div>
+                        </div>
+                    </div>
+
+                    <h4 class="text-xs font-bold text-slate-300 pt-2">Automated Discharged Patient Feedback Tracker</h4>
+                    <div id="patient-feedback-list" class="space-y-2 text-xs">
+                        <!-- Injected Feedback -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- =================================================================== -->
+    <!-- MODALS                                                             -->
+    <!-- =================================================================== -->
+
+    <!-- MODAL: LOG TEMPERATURE & VITALS (NURSE) -->
+    <div id="modal-vitals" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                <h3 id="modal-vitals-title" class="font-bold text-white text-base">Record Daily Vitals</h3>
+                <button onclick="closeModal('modal-vitals')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-vitals" onsubmit="handleVitalsSubmit(event)" class="space-y-3 text-xs">
+                <input type="hidden" id="vitals-patient-id">
+                <div>
+                    <label class="block text-slate-400 mb-1">Temperature (°F) <span class="text-rose-400">*</span></label>
+                    <input type="number" step="0.1" min="95" max="108" id="vitals-temp" required class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-indigo-500">
+                    <span class="text-[10px] text-slate-500 mt-0.5 block">Threshold > 99.5°F flags fever alert</span>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-400 mb-1">Heart Rate (BPM)</label>
+                        <input type="number" id="vitals-hr" value="78" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">SpO2 (%)</label>
+                        <input type="number" id="vitals-spo2" value="98" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">Nurse Observations / Symptoms</label>
+                    <textarea id="vitals-obs" rows="2" placeholder="e.g. Mild headache, appetite normal" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-indigo-500"></textarea>
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('modal-vitals')" class="px-3 py-2 bg-slate-700 text-slate-300 rounded hover:bg-slate-600">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded hover:bg-emerald-500">Save Vital Check</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: DOCTOR CLINICAL DECISION -->
+    <div id="modal-doctor-action" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                <h3 id="modal-doctor-title" class="font-bold text-white text-base">Doctor Clinical Note</h3>
+                <button onclick="closeModal('modal-doctor-action')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-doctor" onsubmit="handleDoctorSubmit(event)" class="space-y-3 text-xs">
+                <input type="hidden" id="doc-patient-id">
+                <div>
+                    <label class="block text-slate-400 mb-1">Prescription / Clinical Notes</label>
+                    <textarea id="doc-notes" rows="3" required placeholder="Log treatment decision or medication adjustment..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-indigo-500"></textarea>
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('modal-doctor-action')" class="px-3 py-2 bg-slate-700 text-slate-300 rounded">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded hover:bg-indigo-500">Record Decision</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADMIT PATIENT (ADMIN) -->
+    <div id="modal-admit" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                <h3 class="font-bold text-white text-base">Admit New Patient</h3>
+                <button onclick="closeModal('modal-admit')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-admit" onsubmit="handleAdmitSubmit(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1">Full Name</label>
+                    <input type="text" id="admit-name" required class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-400 mb-1">Age</label>
+                        <input type="number" id="admit-age" min="1" max="120" required class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Assign Room</label>
+                        <select id="admit-room" required class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:outline-none focus:border-indigo-500">
+                            <!-- Injected ready rooms -->
+                        </select>
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('modal-admit')" class="px-3 py-2 bg-slate-700 text-slate-300 rounded">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded hover:bg-indigo-500">Confirm Admission</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- JAVASCRIPT LOGIC & STATE MANAGEMENT                                 -->
+    <!-- =================================================================== -->
+    <script>
+        // GLOBAL DATA STATE (Initialized with 74 Rooms)
+        const TOTAL_ROOMS = 74;
+        let patients = [];
+        let facilityChartInstance = null;
+
+        // INITIALIZE MOCK DATA
+        function initData() {
+            const sampleNames = ["John Doe", "Alice Smith", "Robert Chen", "Maria Garcia", "David Kim", "Emma Watson", "Liam Miller", "Sophia Patel", "James Wilson", "Olivia Taylor"];
+            
+            for (let room = 1; room <= TOTAL_ROOMS; room++) {
+                // Fill ~55 rooms to simulate 75% capacity initially
+                if (room <= 52) {
+                    const isFever = Math.random() < 0.15;
+                    const tempHistory = isFever 
+                        ? [98.6, 99.1, 100.4] 
+                        : [98.2, 98.4, 98.1];
+                    
+                    patients.push({
+                        id: `PAT-${1000 + room}`,
+                        roomNumber: room,
+                        name: sampleNames[(room - 1) % sampleNames.length] + ` (${room})`,
+                        age: 20 + (room % 50),
+                        status: 'Occupied', // 'Occupied', 'Pending Discharge', 'Needs Cleaning', 'Ready'
+                        checkedToday: room % 2 === 0, // Half checked today
+                        temps: tempHistory,
+                        spo2: 97 + (room % 3),
+                        hr: 72 + (room % 15),
+                        obs: isFever ? "Mild shivering reported" : "Normal recovery, no complaints",
+                        admissionDate: "2026-10-18",
+                        billing: {
+                            dailyRate: 150,
+                            medicalFees: 300,
+                            insuranceStatus: room % 3 === 0 ? 'Approved' : 'Pending Verification',
+                            isPaid: room % 4 === 0
+                        }
+                    });
+                } else if (room <= 55) {
+                    // Rooms needing turnover
+                    patients.push({
+                        id: `PAT-OLD-${room}`,
+                        roomNumber: room,
+                        name: "Vacated Patient",
+                        age: 40,
+                        status: 'Needs Cleaning',
+                        checkedToday: true,
+                        temps: [98.1, 98.0, 98.2],
+                        spo2: 99,
+                        hr: 70,
+                        obs: "Discharged",
+                        admissionDate: "2026-10-15",
+                        billing: { dailyRate: 150, medicalFees: 200, insuranceStatus: 'Approved', isPaid: true }
+                    });
+                } else {
+                    // Ready rooms
+                    patients.push({
+                        id: null,
+                        roomNumber: room,
+                        name: "Vacant Bed",
+                        age: 0,
+                        status: 'Ready',
+                        checkedToday: false,
+                        temps: [],
+                        spo2: 0,
+                        hr: 0,
+                        obs: "",
+                        billing: null
+                    });
+                }
+            }
+        }
+
+        // ROLE SWITCHING LOGIC
+        function switchRole(role) {
+            document.querySelectorAll('.role-section').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.role-tab').forEach(el => {
+                el.classList.remove('bg-indigo-600', 'text-white');
+                el.classList.add('text-slate-300');
+            });
+
+            document.getElementById(`sec-${role}`).classList.remove('hidden');
+            const activeTab = document.getElementById(`tab-${role}`);
+            activeTab.classList.add('bg-indigo-600', 'text-white');
+            activeTab.classList.remove('text-slate-300');
+
+            // Render view-specific data
+            if (role === 'nurse') renderNurseTable();
+            if (role === 'doctor') renderDoctorDashboard();
+            if (role === 'admin') renderAdminGrid();
+            if (role === 'finance') renderFinanceTable();
+            if (role === 'insights') renderInsights();
+            
+            updateHeaderMetrics();
+        }
+
+        // HEADER METRICS UPDATER
+        function updateHeaderMetrics() {
+            const occupiedCount = patients.filter(p => p.status === 'Occupied' || p.status === 'Pending Discharge').length;
+            const occupancyRate = Math.round((occupiedCount / TOTAL_ROOMS) * 100);
+            
+            document.getElementById('header-occupancy').innerText = `${occupiedCount} / ${TOTAL_ROOMS} (${occupancyRate}%)`;
+            
+            const benchmarkBadge = document.getElementById('benchmark-badge');
+            if (occupancyRate >= 85) {
+                benchmarkBadge.className = "px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+                benchmarkBadge.innerText = `85% Benchmark Met (${occupancyRate}%)`;
+            } else {
+                benchmarkBadge.className = "px-2 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30";
+                benchmarkBadge.innerText = `Below 85% Target (${occupancyRate}%)`;
+            }
+
+            // Urgent doctor alerts count badge
+            const feverAlerts = patients.filter(p => p.status === 'Occupied' && p.temps.length > 0 && p.temps[p.temps.length - 1] > 99.5).length;
+            const doctorBadge = document.getElementById('doctor-alert-count');
+            if (feverAlerts > 0) {
+                doctorBadge.innerText = feverAlerts;
+                doctorBadge.classList.remove('hidden');
+            } else {
+                doctorBadge.classList.add('hidden');
+            }
+        }
+
+        // ===================================================================
+        // 1. NURSE DASHBOARD FUNCTIONS
+        // ===================================================================
+        function renderNurseTable() {
+            const tbody = document.getElementById('nurse-patient-tbody');
+            const filter = document.getElementById('nurse-filter').value;
+            tbody.innerHTML = '';
+
+            let activePatients = patients.filter(p => p.status === 'Occupied' || p.status === 'Pending Discharge');
+            
+            let checkedCount = 0;
+            let pendingCount = 0;
+            let feverCount = 0;
+
+            activePatients.forEach(p => {
+                if (p.checkedToday) checkedCount++;
+                else pendingCount++;
+
+                const latestTemp = p.temps.length > 0 ? p.temps[p.temps.length - 1] : null;
+                if (latestTemp && latestTemp > 99.5) feverCount++;
+
+                // Apply Filters
+                if (filter === 'pending_today' && p.checkedToday) return;
+                if (filter === 'fever' && (!latestTemp || latestTemp <= 99.5)) return;
+
+                const isFever = latestTemp && latestTemp > 99.5;
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-700/40 transition";
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono text-indigo-300 font-bold">Room ${p.roomNumber} <span class="text-[10px] text-slate-500 block">${p.id}</span></td>
+                    <td class="py-3 px-4 font-medium text-white">${p.name}</td>
+                    <td class="py-3 px-4">
+                        ${latestTemp ? `<span class="px-2 py-0.5 rounded text-xs font-bold ${isFever ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300'}">${latestTemp}°F</span>` : '<span class="text-slate-500">Unrecorded</span>'}
+                    </td>
+                    <td class="py-3 px-4 text-xs text-slate-400">
+                        ${p.spo2 ? `SpO2: <span class="text-slate-200 font-bold">${p.spo2}%</span> | HR: ${p.hr}` : '--'}
+                    </td>
+                    <td class="py-3 px-4">
+                        ${p.checkedToday 
+                            ? '<span class="inline-flex items-center gap-1 text-xs text-emerald-400"><i class="fa-solid fa-circle-check"></i> Recorded Today</span>' 
+                            : '<span class="inline-flex items-center gap-1 text-xs text-amber-400"><i class="fa-solid fa-clock"></i> Pending Check</span>'}
+                    </td>
+                    <td class="py-3 px-4 text-right">
+                        ${p.checkedToday 
+                            ? `<button disabled class="px-3 py-1 bg-slate-700 text-slate-500 rounded text-xs cursor-not-allowed">Checked Today</button>` 
+                            : `<button onclick="openVitalsModal('${p.id}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-xs transition">Record Temp</button>`}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Update KPIs
+            document.getElementById('nurse-kpi-active').innerText = activePatients.length;
+            document.getElementById('nurse-kpi-checked').innerText = checkedCount;
+            document.getElementById('nurse-kpi-pending').innerText = pendingCount;
+            document.getElementById('nurse-kpi-fever').innerText = feverCount;
+        }
+
+        function openVitalsModal(patientId) {
+            const p = patients.find(pt => pt.id === patientId);
+            if (!p) return;
+            document.getElementById('vitals-patient-id').value = p.id;
+            document.getElementById('modal-vitals-title').innerText = `Record Daily Vitals - Room ${p.roomNumber} (${p.name})`;
+            document.getElementById('vitals-temp').value = '';
+            document.getElementById('vitals-obs').value = '';
+            document.getElementById('modal-vitals').classList.remove('hidden');
+        }
+
+        function handleVitalsSubmit(e) {
+            e.preventDefault();
+            const pid = document.getElementById('vitals-patient-id').value;
+            const temp = parseFloat(document.getElementById('vitals-temp').value);
+            const hr = parseInt(document.getElementById('vitals-hr').value);
+            const spo2 = parseInt(document.getElementById('vitals-spo2').value);
+            const obs = document.getElementById('vitals-obs').value;
+
+            const p = patients.find(pt => pt.id === pid);
+            if (p) {
+                // DUPLICATE ENTRY PREVENTION CHECK
+                if (p.checkedToday) {
+                    showToast("Duplicate Entry Blocked", "This patient has already been checked today.", "error");
+                    closeModal('modal-vitals');
+                    return;
+                }
+
+                p.temps.push(temp);
+                p.hr = hr;
+                p.spo2 = spo2;
+                p.obs = obs;
+                p.checkedToday = true;
+
+                closeModal('modal-vitals');
+                renderNurseTable();
+                updateHeaderMetrics();
+
+                if (temp > 99.5) {
+                    showToast("Fever Alert Flagged", `High temperature (${temp}°F) recorded for Room ${p.roomNumber}. Doctor task auto-generated.`, "warning");
+                } else {
+                    showToast("Vitals Recorded", `Temperature ${temp}°F logged successfully for Room ${p.roomNumber}.`, "success");
+                }
+            }
+        }
+
+        // ===================================================================
+        // 2. DOCTOR DASHBOARD FUNCTIONS
+        // ===================================================================
+        function renderDoctorDashboard() {
+            const urgentContainer = document.getElementById('doctor-urgent-tasks');
+            const tbody = document.getElementById('doctor-patient-tbody');
+            urgentContainer.innerHTML = '';
+            tbody.innerHTML = '';
+
+            const activePatients = patients.filter(p => p.status === 'Occupied' || p.status === 'Pending Discharge');
+
+            // Render High Priority Tasks (Patients with recent temp > 99.5°F)
+            const feverPatients = activePatients.filter(p => p.temps.length > 0 && p.temps[p.temps.length - 1] > 99.5);
+            
+            if (feverPatients.length === 0) {
+                urgentContainer.innerHTML = `<div class="col-span-2 text-slate-400 italic text-xs">No active urgent fever alerts. All patients stable.</div>`;
+            } else {
+                feverPatients.forEach(p => {
+                    const div = document.createElement('div');
+                    div.className = "bg-slate-900/80 p-3 rounded-lg border border-rose-800/60 flex justify-between items-center";
+                    div.innerHTML = `
+                        <div>
+                            <span class="font-bold text-white">Room ${p.roomNumber} - ${p.name}</span>
+                            <p class="text-[11px] text-rose-300">Latest Temp: <span class="font-bold">${p.temps[p.temps.length - 1]}°F</span> | ${p.obs}</p>
+                        </div>
+                        <button onclick="openDoctorActionModal('${p.id}')" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded font-bold text-[11px]">Prescribe / Review</button>
+                    `;
+                    urgentContainer.appendChild(div);
+                });
+            }
+
+            // Render Main Doctor Patient Table
+            activePatients.forEach(p => {
+                // Check 3-Day Fever-Free Rule
+                // Requires 3 consecutive recordings all < 99.5°F
+                const recentTemps = p.temps.slice(-3);
+                const has3DaysData = recentTemps.length >= 3;
+                const is3DaysNoFever = has3DaysData && recentTemps.every(t => t < 99.5);
+
+                const latestTemp = p.temps.length > 0 ? p.temps[p.temps.length - 1] : 'N/A';
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-700/40 transition";
+                tr.innerHTML = `
+                    <td class="py-3 px-4">
+                        <span class="font-bold text-white block">Room ${p.roomNumber}</span>
+                        <span class="text-xs text-slate-400">${p.name}</span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-1 font-mono text-xs">
+                            ${p.temps.map(t => `<span class="px-1.5 py-0.5 rounded ${t > 99.5 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-slate-700 text-slate-200'}">${t}°</span>`).join(' → ')}
+                        </div>
+                    </td>
+                    <td class="py-3 px-4">
+                        ${latestTemp > 99.5 
+                            ? '<span class="text-xs font-bold text-rose-400 flex items-center gap-1"><i class="fa-solid fa-fire"></i> Active Fever</span>' 
+                            : '<span class="text-xs font-bold text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-check"></i> Normal</span>'}
+                    </td>
+                    <td class="py-3 px-4">
+                        ${is3DaysNoFever 
+                            ? '<span class="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"><i class="fa-solid fa-shield-check"></i> Rule Met (3 Days <99.5°)</span>' 
+                            : `<span class="px-2 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30"><i class="fa-solid fa-lock"></i> Ineligible (${recentTemps.length}/3 days)</span>`}
+                    </td>
+                    <td class="py-3 px-4 text-right space-x-2">
+                        <button onclick="openDoctorActionModal('${p.id}')" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded text-xs">Clinical Note</button>
+                        ${is3DaysNoFever && p.status !== 'Pending Discharge'
+                            ? `<button onclick="authorizeDischarge('${p.id}')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded text-xs transition">Authorize Discharge</button>`
+                            : `<button disabled title="Enforces 3 consecutive fever-free days" class="px-3 py-1 bg-slate-800 text-slate-600 rounded text-xs cursor-not-allowed border border-slate-700">Authorize Discharge</button>`}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openDoctorActionModal(patientId) {
+            const p = patients.find(pt => pt.id === patientId);
+            if (!p) return;
+            document.getElementById('doc-patient-id').value = p.id;
+            document.getElementById('modal-doctor-title').innerText = `Clinical Decision - Room ${p.roomNumber} (${p.name})`;
+            document.getElementById('doc-notes').value = '';
+            document.getElementById('modal-doctor-action').classList.remove('hidden');
+        }
+
+        function handleDoctorSubmit(e) {
+            e.preventDefault();
+            const pid = document.getElementById('doc-patient-id').value;
+            const notes = document.getElementById('doc-notes').value;
+            const p = patients.find(pt => pt.id === pid);
+            if (p) {
+                p.obs += ` | Doctor Note: ${notes}`;
+                closeModal('modal-doctor-action');
+                showToast("Clinical Decision Saved", `Treatment note updated for Room ${p.roomNumber}.`, "success");
+                renderDoctorDashboard();
+            }
+        }
+
+        function authorizeDischarge(patientId) {
+            const p = patients.find(pt => pt.id === patientId);
+            if (!p) return;
+
+            // Update Patient Status
+            p.status = 'Needs Cleaning'; // Direct trigger to room turnover workflow
+            
+            showToast("Discharge Authorized", `Patient in Room ${p.roomNumber} discharged. Room turnover task auto-triggered for Admin.`, "success");
+            
+            updateHeaderMetrics();
+            renderDoctorDashboard();
+        }
+
+        // ===================================================================
+        // 3. ADMIN / OPERATIONS (74 ROOM GRID & TURNOVER)
+        // ===================================================================
+        function renderAdminGrid() {
+            const grid = document.getElementById('room-grid');
+            grid.innerHTML = '';
+
+            patients.sort((a, b) => a.roomNumber - b.roomNumber).forEach(p => {
+                const card = document.createElement('div');
+                
+                let statusBg = "bg-slate-800 border-slate-700 text-slate-400";
+                let statusLabel = "Ready";
+                let badgeClass = "bg-slate-700 text-slate-300";
+
+                const latestTemp = p.temps.length > 0 ? p.temps[p.temps.length - 1] : null;
+
+                if (p.status === 'Occupied') {
+                    if (latestTemp && latestTemp > 99.5) {
+                        statusBg = "bg-rose-950/40 border-rose-700/60 text-rose-200";
+                        statusLabel = "Fever Alert";
+                        badgeClass = "bg-rose-600 text-white";
+                    } else {
+                        statusBg = "bg-emerald-950/30 border-emerald-800/50 text-emerald-200";
+                        statusLabel = "Occupied";
+                        badgeClass = "bg-emerald-600 text-white";
+                    }
+                } else if (p.status === 'Needs Cleaning') {
+                    statusBg = "bg-purple-950/40 border-purple-800/60 text-purple-200";
+                    statusLabel = "Needs Cleaning";
+                    badgeClass = "bg-purple-600 text-white";
+                }
+
+                card.className = `p-2.5 rounded-lg border text-center relative flex flex-col justify-between shadow ${statusBg} transition hover:scale-105`;
+                card.innerHTML = `
+                    <div class="flex justify-between items-center text-[10px] font-bold mb-1">
+                        <span>R-${p.roomNumber}</span>
+                        <span class="px-1.5 py-0.2 rounded text-[9px] ${badgeClass}">${statusLabel}</span>
+                    </div>
+                    <div class="my-1">
+                        <p class="text-xs font-bold truncate text-white">${p.name}</p>
+                        ${latestTemp ? `<p class="text-[10px] font-mono mt-0.5">${latestTemp}°F</p>` : ''}
+                    </div>
+                    <div class="mt-2 pt-1 border-t border-slate-700/50">
+                        ${p.status === 'Needs Cleaning' 
+                            ? `<button onclick="confirmRoomCleaning(${p.roomNumber})" class="w-full py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-[10px] font-bold transition">Mark Sterilized</button>`
+                            : p.status === 'Ready' 
+                                ? `<span class="text-[10px] text-slate-500">Available</span>`
+                                : `<span class="text-[10px] text-slate-400">In Treatment</span>`}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function confirmRoomCleaning(roomNum) {
+            const p = patients.find(pt => pt.roomNumber === roomNum);
+            if (p) {
+                p.status = 'Ready';
+                p.name = 'Vacant Bed';
+                p.id = null;
+                p.temps = [];
+                p.checkedToday = false;
+                p.billing = null;
+
+                showToast("Room Sterilized & Ready", `Room ${roomNum} is now disinfected and available for new admissions.`, "success");
+                renderAdminGrid();
+                updateHeaderMetrics();
+            }
+        }
+
+        function openAdmissionModal() {
+            const select = document.getElementById('admit-room');
+            select.innerHTML = '';
+            
+            const readyRooms = patients.filter(p => p.status === 'Ready');
+            if (readyRooms.length === 0) {
+                showToast("Facility Full", "No ready rooms available for new admission.", "error");
+                return;
+            }
+
+            readyRooms.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.roomNumber;
+                opt.innerText = `Room ${r.roomNumber}`;
+                select.appendChild(opt);
+            });
+
+            document.getElementById('modal-admit').classList.remove('hidden');
+        }
+
+        function handleAdmitSubmit(e) {
+            e.preventDefault();
+            const name = document.getElementById('admit-name').value;
+            const age = parseInt(document.getElementById('admit-age').value);
+            const roomNum = parseInt(document.getElementById('admit-room').value);
+
+            const p = patients.find(pt => pt.roomNumber === roomNum);
+            if (p) {
+                p.id = `PAT-${2000 + roomNum}`;
+                p.name = name;
+                p.age = age;
+                p.status = 'Occupied';
+                p.temps = [98.6];
+                p.checkedToday = true;
+                p.admissionDate = new Date().toISOString().split('T')[0];
+                p.billing = {
+                    dailyRate: 150,
+                    medicalFees: 200,
+                    insuranceStatus: 'Pending Verification',
+                    isPaid: false
+                };
+
+                closeModal('modal-admit');
+                showToast("Patient Admitted", `${name} admitted to Room ${roomNum}.`, "success");
+                renderAdminGrid();
+                updateHeaderMetrics();
+            }
+        }
+
+        // ===================================================================
+        // 4. FINANCE & BILLING FUNCTIONS
+        // ===================================================================
+        function renderFinanceTable() {
+            const tbody = document.getElementById('finance-tbody');
+            tbody.innerHTML = '';
+
+            const billingPatients = patients.filter(p => p.billing !== null);
+
+            billingPatients.forEach(p => {
+                const stayDays = 5; // Fixed mock length
+                const totalAmount = (stayDays * p.billing.dailyRate) + p.billing.medicalFees;
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-700/40 transition";
+                tr.innerHTML = `
+                    <td class="py-3 px-4">
+                        <span class="font-bold text-white block">Room ${p.roomNumber}</span>
+                        <span class="text-xs text-slate-400">${p.name}</span>
+                    </td>
+                    <td class="py-3 px-4 text-xs">${stayDays} Days (${p.admissionDate})</td>
+                    <td class="py-3 px-4 font-mono font-bold text-amber-300">$${totalAmount}.00</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-0.5 rounded text-xs font-bold ${p.billing.insuranceStatus === 'Approved' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}">
+                            ${p.billing.insuranceStatus}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        ${p.billing.isPaid 
+                            ? '<span class="text-xs text-emerald-400 font-bold"><i class="fa-solid fa-circle-check"></i> Paid</span>' 
+                            : `<button onclick="togglePayment('${p.roomNumber}')" class="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs font-bold">Mark Paid</button>`}
+                    </td>
+                    <td class="py-3 px-4 text-right">
+                        ${p.billing.isPaid 
+                            ? `<button onclick="generateInvoicePDF('${p.roomNumber}', ${totalAmount})" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-bold flex items-center gap-1 ml-auto"><i class="fa-solid fa-file-pdf"></i> Download Invoice</button>`
+                            : `<span class="text-xs text-slate-500">Requires Payment</span>`}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function togglePayment(roomNum) {
+            const p = patients.find(pt => pt.roomNumber == roomNum);
+            if (p && p.billing) {
+                p.billing.isPaid = true;
+                showToast("Payment Confirmed", `Invoice cleared for Room ${roomNum}. Printable receipt ready.`, "success");
+                renderFinanceTable();
+            }
+        }
+
+        function generateInvoicePDF(roomNum, amount) {
+            const p = patients.find(pt => pt.roomNumber == roomNum);
+            if (!p) return;
+
+            const printWindow = window.open('', '', 'width=600,height=600');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Invoice - Room ${roomNum}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+                        .header { border-bottom: 2px solid #333; padding-bottom: 10px; }
+                        .details { margin-top: 20px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h2>BioShield Quarantine Center</h2>
+                        <p>Official Billing Statement & Receipt</p>
+                    </div>
+                    <div class="details">
+                        <p><strong>Patient Name:</strong> ${p.name}</p>
+                        <p><strong>Room Allocation:</strong> Bed #${roomNum}</p>
+                        <p><strong>Admission Date:</strong> ${p.admissionDate}</p>
+                    </div>
+                    <table>
+                        <tr><th>Description</th><th>Amount</th></tr>
+                        <tr><td>Quarantine Stay (5 Days @ $150/day)</td><td>$750.00</td></tr>
+                        <tr><td>Medical & Monitoring Fees</td><td>$${p.billing.medicalFees}.00</td></tr>
+                        <tr><th>Total Paid</th><th>$${amount}.00</th></tr>
+                    </table>
+                    <p style="margin-top: 30px; font-size: 12px; color: #666;">Status: PAID IN FULL - THANK YOU</p>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        // ===================================================================
+        // 5. HR & SMART INSIGHTS FUNCTIONS
+        // ===================================================================
+        function renderInsights() {
+            // Render Patient Feedback List
+            const feedbackContainer = document.getElementById('patient-feedback-list');
+            feedbackContainer.innerHTML = `
+                <div class="p-2.5 bg-slate-900/60 rounded border border-slate-700 flex justify-between items-center">
+                    <div>
+                        <span class="font-bold text-white">Discharged Patient PAT-1002</span>
+                        <p class="text-slate-400">"Excellent care from nursing staff. Fast discharge process."</p>
+                    </div>
+                    <span class="text-amber-400 font-bold">★ 5.0</span>
+                </div>
+                <div class="p-2.5 bg-slate-900/60 rounded border border-slate-700 flex justify-between items-center">
+                    <div>
+                        <span class="font-bold text-white">Discharged Patient PAT-1014</span>
+                        <p class="text-slate-400">"Room cleaning was very prompt after doctor approval."</p>
+                    </div>
+                    <span class="text-amber-400 font-bold">★ 4.8</span>
+                </div>
+            `;
+
+            // Chart Render
+            const ctx = document.getElementById('facilityTrendChart').getContext('2d');
+            if (facilityChartInstance) facilityChartInstance.destroy();
+
+            facilityChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'],
+                    datasets: [
+                        {
+                            label: 'Avg Facility Temp (°F)',
+                            data: [98.8, 98.6, 98.9, 98.4, 98.3, 98.2, 98.1],
+                            borderColor: '#818cf8',
+                            backgroundColor: 'rgba(129, 140, 248, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Fever Incidents Flagged',
+                            data: [12, 9, 7, 5, 4, 3, 2],
+                            borderColor: '#f43f5e',
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5]
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8', font: { size: 11 } } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#64748b' }, grid: { color: '#334155' } },
+                        y: { ticks: { color: '#64748b' }, grid: { color: '#334155' } }
+                    }
+                }
+            });
+        }
+
+        // ===================================================================
+        // UTILITY FUNCTIONS
+        // ===================================================================
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function showToast(title, message, type = 'info') {
+            const toast = document.getElementById('toast-notification');
+            const toastTitle = document.getElementById('toast-title');
+            const toastMsg = document.getElementById('toast-msg');
+            const toastIcon = document.getElementById('toast-icon');
+
+            toastTitle.innerText = title;
+            toastMsg.innerText = message;
+
+            if (type === 'success') {
+                toast.className = "fixed bottom-5 right-5 z-50 max-w-md bg-slate-800 border-l-4 border-emerald-500 text-slate-200 p-4 rounded-r-lg shadow-2xl flex items-center justify-between gap-3";
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-xl";
+            } else if (type === 'warning' || type === 'error') {
+                toast.className = "fixed bottom-5 right-5 z-50 max-w-md bg-slate-800 border-l-4 border-rose-500 text-slate-200 p-4 rounded-r-lg shadow-2xl flex items-center justify-between gap-3";
+                toastIcon.className = "fa-solid fa-triangle-exclamation text-rose-400 text-xl";
+            } else {
+                toast.className = "fixed bottom-5 right-5 z-50 max-w-md bg-slate-800 border-l-4 border-indigo-500 text-slate-200 p-4 rounded-r-lg shadow-2xl flex items-center justify-between gap-3";
+                toastIcon.className = "fa-solid fa-circle-info text-indigo-400 text-xl";
+            }
+
+            toast.classList.remove('hidden');
+            setTimeout(() => closeToast(), 5000);
+        }
+
+        function closeToast() {
+            document.getElementById('toast-notification').classList.add('hidden');
+        }
+
+        // INITIALIZE ON LOAD
+        window.onload = function() {
+            initData();
+            switchRole('nurse');
+        };
+    </script>
+</body>
+</html>
